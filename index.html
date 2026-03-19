@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Command Center — Cowork Tasks</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #0a0a0f;
+            --card-bg: #12121a;
+            --card-border: #1e1e2e;
+            --accent: #22c55e;
+            --accent-dim: rgba(34, 197, 94, 0.1);
+            --accent-glow: rgba(34, 197, 94, 0.3);
+            --text: #e4e4e7;
+            --text-dim: #71717a;
+            --text-mid: #a1a1aa;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --blue: #3b82f6;
+        }
+        body {
+            font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image:
+                linear-gradient(rgba(34, 197, 94, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(34, 197, 94, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: 0;
+            animation: gridMove 20s linear infinite;
+        }
+        @keyframes gridMove { 0% { transform: translate(0,0); } 100% { transform: translate(50px,50px); } }
+
+        .container { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 30px 24px; }
+
+        /* Header */
+        .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; padding-bottom: 20px; border-bottom: 1px solid var(--card-border); }
+        .header-left { display: flex; align-items: center; gap: 16px; }
+        .logo { width: 40px; height: 40px; background: var(--accent-dim); border: 1px solid var(--accent); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 0 20px var(--accent-glow); }
+        .header h1 { font-size: 20px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); }
+        .header h1 span { color: var(--text-dim); font-weight: 400; }
+        .live-badge { display: flex; align-items: center; gap: 8px; background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2); padding: 6px 14px; border-radius: 20px; font-size: 11px; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; }
+        .live-dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; animation: pulse 2s ease-in-out infinite; }
+        @keyframes pulse { 0%,100% { opacity:1; box-shadow: 0 0 0 0 var(--accent-glow); } 50% { opacity:0.5; box-shadow: 0 0 0 6px transparent; } }
+        .clock { font-size: 32px; font-weight: 700; color: var(--text); letter-spacing: 2px; }
+        .clock-date { font-size: 11px; color: var(--text-dim); margin-top: 2px; text-align: right; }
+
+        /* Stats */
+        .stats-bar { display: flex; gap: 16px; margin-bottom: 28px; }
+        .stat-item { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 10px; padding: 14px 20px; flex: 1; display: flex; align-items: center; gap: 12px; }
+        .stat-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+        .stat-icon.green { background: var(--accent-dim); }
+        .stat-icon.blue { background: rgba(59,130,246,0.1); }
+        .stat-icon.yellow { background: rgba(245,158,11,0.1); }
+        .stat-info { display: flex; flex-direction: column; }
+        .stat-value { font-size: 22px; font-weight: 700; }
+        .stat-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+
+        /* Task Grid */
+        .task-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 16px; }
+        .task-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; overflow: hidden; transition: all 0.3s ease; cursor: pointer; }
+        .task-card:hover { border-color: rgba(34,197,94,0.3); box-shadow: 0 0 30px rgba(34,197,94,0.05); transform: translateY(-2px); }
+        .task-card.active { border-color: var(--accent); box-shadow: 0 0 20px var(--accent-glow); }
+        .task-card-header { padding: 18px 20px 12px; display: flex; justify-content: space-between; align-items: flex-start; }
+        .task-number { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px; }
+        .task-title { font-size: 15px; font-weight: 600; color: var(--text); line-height: 1.4; }
+        .task-status { padding: 4px 10px; border-radius: 6px; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; white-space: nowrap; }
+        .status-active { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(34,197,94,0.2); }
+        .status-waiting { background: rgba(245,158,11,0.1); color: var(--warning); border: 1px solid rgba(245,158,11,0.2); }
+        .task-card-body { padding: 0 20px 16px; }
+        .task-description { font-size: 12px; color: var(--text-mid); line-height: 1.6; margin-bottom: 14px; }
+        .task-meta { display: flex; flex-wrap: wrap; gap: 8px; }
+        .meta-tag { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-dim); background: rgba(255,255,255,0.03); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); }
+        .task-card-footer { padding: 12px 20px; background: rgba(0,0,0,0.2); border-top: 1px solid var(--card-border); display: flex; justify-content: space-between; align-items: center; }
+        .next-run { font-size: 11px; color: var(--text-dim); }
+        .next-run strong { color: var(--accent); font-weight: 600; }
+        .countdown { font-size: 12px; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; }
+
+        /* Report Panel */
+        .report-panel {
+            margin-top: 24px;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            overflow: hidden;
+            display: none;
+            animation: slideDown 0.3s ease;
+        }
+        .report-panel.visible { display: block; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .report-panel-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--card-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .report-panel-title { font-size: 14px; font-weight: 600; color: var(--accent); }
+        .report-close {
+            background: none; border: 1px solid var(--card-border); color: var(--text-dim);
+            padding: 4px 12px; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 11px;
+            transition: all 0.2s;
+        }
+        .report-close:hover { border-color: var(--accent); color: var(--accent); }
+
+        .report-tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid var(--card-border);
+            overflow-x: auto;
+        }
+        .report-tab {
+            padding: 10px 20px;
+            font-size: 11px;
+            color: var(--text-dim);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            white-space: nowrap;
+            transition: all 0.2s;
+            font-family: inherit;
+            background: none;
+            border-top: none;
+            border-left: none;
+            border-right: none;
+        }
+        .report-tab:hover { color: var(--text); }
+        .report-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+        .report-content {
+            padding: 20px;
+            max-height: 500px;
+            overflow-y: auto;
+            font-size: 13px;
+            line-height: 1.8;
+            color: var(--text-mid);
+        }
+        .report-content::-webkit-scrollbar { width: 6px; }
+        .report-content::-webkit-scrollbar-track { background: var(--card-bg); }
+        .report-content::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 3px; }
+
+        /* Markdown-like styling in reports */
+        .report-content h1, .report-content h2, .report-content h3 {
+            color: var(--text);
+            margin: 16px 0 8px;
+        }
+        .report-content h1 { font-size: 18px; color: var(--accent); }
+        .report-content h2 { font-size: 15px; border-bottom: 1px solid var(--card-border); padding-bottom: 6px; }
+        .report-content h3 { font-size: 13px; }
+        .report-content strong { color: var(--text); }
+        .report-content a { color: var(--blue); text-decoration: none; }
+        .report-content a:hover { text-decoration: underline; }
+        .report-content ul, .report-content ol { padding-left: 20px; margin: 8px 0; }
+        .report-content li { margin: 4px 0; }
+        .report-content code { background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+        .report-content hr { border: none; border-top: 1px solid var(--card-border); margin: 12px 0; }
+        .report-content blockquote { border-left: 3px solid var(--accent); padding-left: 12px; margin: 8px 0; color: var(--text-dim); }
+
+        .no-report { text-align: center; padding: 40px; color: var(--text-dim); font-size: 13px; }
+        .report-date-badge {
+            display: inline-block;
+            background: rgba(59,130,246,0.1);
+            color: var(--blue);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            margin-left: 8px;
+        }
+
+        /* Week grid */
+        .timeline-section { margin-top: 24px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 20px; }
+        .timeline-title { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: var(--text-dim); margin-bottom: 16px; }
+        .week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-top: 16px; }
+        .week-day { background: rgba(0,0,0,0.2); border: 1px solid var(--card-border); border-radius: 8px; padding: 12px 8px; text-align: center; }
+        .week-day.today { border-color: var(--accent); box-shadow: 0 0 15px rgba(34,197,94,0.1); }
+        .week-day-name { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+        .week-day-num { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+        .week-day.today .week-day-num { color: var(--accent); }
+        .week-tasks { display: flex; flex-direction: column; gap: 3px; }
+        .week-task-dot { font-size: 8px; padding: 2px 6px; border-radius: 3px; background: var(--accent-dim); color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .week-task-dot.blue { background: rgba(59,130,246,0.1); color: var(--blue); }
+        .week-task-dot.yellow { background: rgba(245,158,11,0.1); color: var(--warning); }
+
+        /* Compact usage meters in header */
+        .usage-compact { display: flex; gap: 12px; align-items: center; }
+        .usage-mini { display: flex; align-items: center; gap: 6px; }
+        .usage-mini-ring { position: relative; width: 32px; height: 32px; }
+        .usage-mini-ring svg { width: 32px; height: 32px; transform: rotate(-90deg); }
+        .usage-mini-ring circle { fill: none; stroke-width: 3; }
+        .usage-mini-ring .ring-bg { stroke: rgba(255,255,255,0.06); }
+        .usage-mini-ring .ring-fill { stroke-linecap: round; transition: stroke-dashoffset 1s ease; }
+        .usage-mini-ring .ring-fill.green { stroke: var(--accent); }
+        .usage-mini-ring .ring-fill.blue { stroke: var(--blue); }
+        .usage-mini-ring .ring-fill.yellow { stroke: var(--warning); }
+        .usage-mini-ring .ring-fill.red { stroke: var(--danger); }
+        .usage-mini-pct { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 8px; font-weight: 700; }
+        .usage-mini-info { display: flex; flex-direction: column; }
+        .usage-mini-label { font-size: 9px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; line-height: 1; }
+        .usage-mini-val { font-size: 11px; font-weight: 600; color: var(--text); line-height: 1.2; }
+
+        .scanline { position: fixed; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--accent-glow), transparent); z-index: 100; animation: scanline 4s linear infinite; opacity: 0.5; }
+        @keyframes scanline { 0% { top: -2px; } 100% { top: 100vh; } }
+
+        /* Refresh button */
+        .refresh-btn {
+            background: var(--accent-dim); border: 1px solid rgba(34,197,94,0.2); color: var(--accent);
+            padding: 6px 14px; border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 11px;
+            text-transform: uppercase; letter-spacing: 1px; transition: all 0.2s; display: flex; align-items: center; gap: 6px;
+        }
+        .refresh-btn:hover { background: rgba(34,197,94,0.2); }
+        .refresh-btn.loading { opacity: 0.5; pointer-events: none; }
+
+        @media (max-width: 900px) {
+            .task-grid { grid-template-columns: 1fr; }
+            .stats-bar { flex-wrap: wrap; }
+            .stat-item { min-width: calc(50% - 8px); }
+            .header { flex-direction: column; gap: 16px; align-items: flex-start; }
+        }
+    </style>
+</head>
+<body>
+    <div class="scanline"></div>
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <div class="logo">⚡</div>
+                <div><h1>Command Center <span>/ Cowork</span></h1></div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <div class="usage-compact" id="usage-compact" style="display:none;">
+                    <div class="usage-mini" id="mini-session">
+                        <div class="usage-mini-ring">
+                            <svg viewBox="0 0 32 32"><circle class="ring-bg" cx="16" cy="16" r="13"/><circle class="ring-fill green" cx="16" cy="16" r="13" stroke-dasharray="81.68" stroke-dashoffset="81.68"/></svg>
+                            <div class="usage-mini-pct">—</div>
+                        </div>
+                        <div class="usage-mini-info"><div class="usage-mini-label">Session</div><div class="usage-mini-val" id="mini-session-val">—</div></div>
+                    </div>
+                    <div class="usage-mini" id="mini-weekly">
+                        <div class="usage-mini-ring">
+                            <svg viewBox="0 0 32 32"><circle class="ring-bg" cx="16" cy="16" r="13"/><circle class="ring-fill blue" cx="16" cy="16" r="13" stroke-dasharray="81.68" stroke-dashoffset="81.68"/></svg>
+                            <div class="usage-mini-pct">—</div>
+                        </div>
+                        <div class="usage-mini-info"><div class="usage-mini-label">Weekly</div><div class="usage-mini-val" id="mini-weekly-val">—</div></div>
+                    </div>
+                </div>
+                <div id="last-updated" style="font-size:10px; color:var(--text-dim); text-align:right; letter-spacing:0.5px;"></div>
+                <div class="live-badge"><div class="live-dot"></div> Live</div>
+                <div>
+                    <div class="clock" id="clock">--:--:--</div>
+                    <div class="clock-date" id="clock-date"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-bar">
+            <div class="stat-item"><div class="stat-icon green">📋</div><div class="stat-info"><div class="stat-value">5</div><div class="stat-label">Active Tasks</div></div></div>
+            <div class="stat-item"><div class="stat-icon blue">🔄</div><div class="stat-info"><div class="stat-value" id="runs-this-week">0</div><div class="stat-label">Runs This Week</div></div></div>
+            <div class="stat-item"><div class="stat-icon yellow">⏳</div><div class="stat-info"><div class="stat-value" id="next-run-stat">--</div><div class="stat-label">Next Run</div></div></div>
+            <div class="stat-item"><div class="stat-icon green">✅</div><div class="stat-info"><div class="stat-value" id="health-stat">100%</div><div class="stat-label">Health</div></div></div>
+        </div>
+
+        <div class="task-grid" id="task-grid"></div>
+
+        <!-- Report Panel -->
+        <div class="report-panel" id="report-panel">
+            <div class="report-panel-header">
+                <div class="report-panel-title" id="report-panel-title">Report</div>
+                <button class="report-close" onclick="closeReport()">Close</button>
+            </div>
+            <div class="report-tabs" id="report-tabs"></div>
+            <div class="report-content" id="report-content">
+                <div class="no-report">Select a task to view its reports</div>
+            </div>
+        </div>
+
+        <div class="timeline-section" style="margin-top: 24px;">
+            <div class="timeline-title">📅 This Week's Schedule</div>
+            <div class="week-grid" id="week-grid"></div>
+        </div>
+    </div>
+
+    <script>
+        const tasks = [
+            { id: 1, taskId: 'weekly-employee-analysis', title: 'Weekly Employee Analysis', description: 'Analyze all Insightful.io employees weekly and send Georgian report — თანამშრომლების პროდუქტიულობის ანალიზი', schedule: 'Every Friday at 11:03', cron: { day: 5, hour: 11, minute: 3 }, color: 'green', tags: ['Insightful.io', 'HR', 'Report'] },
+            { id: 2, taskId: 'alpaca-competitor-check', title: 'Alpaca Competitor Check', description: 'ყოველ ორშაბათს და ხუთშაბათს Alpaca.ge-ის კონკურენტული ანალიზი — ფასები, სერვისები, მარკეტინგი', schedule: 'Mon & Thu at 11:00', cron: { days: [1, 4], hour: 11, minute: 0 }, color: 'blue', tags: ['Alpaca.ge', 'Competitors', 'Analysis'] },
+            { id: 3, taskId: 'weekly-employee-performance-analysis', title: 'Weekly Employee Performance', description: 'ყოველ ოთხშაბათს — კლიენტ ჩატებში თანამშრომლების პერფორმანსის ანალიზი და რეკომენდაციები', schedule: 'Every Wednesday at 9:03', cron: { day: 3, hour: 9, minute: 3 }, color: 'yellow', tags: ['Performance', 'Chat Analysis', 'HR'] },
+            { id: 4, taskId: '10xseo-weekly-monitor', title: '10xSEO Weekly Monitor', description: 'ყოველ ორშაბათს — 10 არხის (YouTube + Instagram) მონიტორინგი, ახალი კონტენტის ანალიზი', schedule: 'Every Monday at 9:07', cron: { day: 1, hour: 9, minute: 7 }, color: 'green', tags: ['10xSEO', 'YouTube', 'Instagram'] },
+            { id: 5, taskId: '10xseo-biweekly-analytics', title: '10xSEO Biweekly Analytics', description: '2 კვირაში ერთხელ გაანალიზე Hotjar, Search Console და Google Analytics — სრული SEO რეპორტი', schedule: 'Day 1 & 15 at 09:00', cron: { days_of_month: [1, 15], hour: 9, minute: 0 }, color: 'blue', tags: ['Hotjar', 'Search Console', 'GA4'] }
+        ];
+
+        const dayNames = ['კვი','ორშ','სამ','ოთხ','ხუთ','პარ','შაბ'];
+        const dayNamesFull = ['კვირა','ორშაბათი','სამშაბათი','ოთხშაბათი','ხუთშაბათი','პარასკევი','შაბათი'];
+        const monthNames = ['იანვარი','თებერვალი','მარტი','აპრილი','მაისი','ივნისი','ივლისი','აგვისტო','სექტემბერი','ოქტომბერი','ნოემბერი','დეკემბერი'];
+
+        let reportsData = null;
+        let activeTaskId = null;
+
+        // Load reports JSON
+        async function loadReports() {
+            try {
+                const resp = await fetch('reports-data.json?t=' + Date.now());
+                const newData = await resp.json();
+                const changed = JSON.stringify(newData) !== JSON.stringify(reportsData);
+                reportsData = newData;
+
+                // Show last updated time
+                if (reportsData.generated_at) {
+                    const gen = new Date(reportsData.generated_at);
+                    const ago = Math.floor((Date.now() - gen) / 60000);
+                    const agoStr = ago < 1 ? 'just now' : ago < 60 ? `${ago}m ago` : `${Math.floor(ago/60)}h ago`;
+                    document.getElementById('last-updated').innerHTML = `Data: <span style="color:var(--accent)">${agoStr}</span>`;
+                }
+
+                if (changed && reportsData) {
+                    renderTasks();
+                    if (reportsData.usage) renderUsage(reportsData.usage);
+                    // Re-render active report if open
+                    if (activeTaskId) openReport(activeTaskId);
+                }
+            } catch (e) {
+                console.warn('Could not load reports:', e);
+            }
+        }
+
+        // Simple markdown to HTML
+        function md(text) {
+            if (!text) return '';
+            let html = text
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                // Headers
+                .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+                .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+                .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+                // HR
+                .replace(/^---+$/gm, '<hr>')
+                // Bold
+                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                // Italic
+                .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                // Code
+                .replace(/`(.+?)`/g, '<code>$1</code>')
+                // Links
+                .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+                // Lists
+                .replace(/^- (.+)$/gm, '<li>$1</li>')
+                .replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>')
+                // Paragraphs
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/\n/g, '<br>');
+            // Wrap loose <li> in <ul>
+            html = html.replace(/((?:<li>.*?<\/li>\s*(?:<br>)?)+)/g, '<ul>$1</ul>');
+            return '<p>' + html + '</p>';
+        }
+
+        function getNextRun(task) {
+            const now = new Date();
+            let next = new Date(now);
+            if (task.cron.days_of_month) {
+                const cm = now.getMonth(), cy = now.getFullYear();
+                let found = false;
+                for (const d of task.cron.days_of_month) {
+                    const c = new Date(cy, cm, d, task.cron.hour, task.cron.minute, 0);
+                    if (c > now) { next = c; found = true; break; }
+                }
+                if (!found) next = new Date(cy, cm+1, task.cron.days_of_month[0], task.cron.hour, task.cron.minute, 0);
+            } else if (task.cron.days) {
+                let minDiff = Infinity;
+                for (const td of task.cron.days) {
+                    let d = td - now.getDay(); if (d < 0) d += 7;
+                    if (d === 0) {
+                        const tr = new Date(now); tr.setHours(task.cron.hour, task.cron.minute, 0, 0);
+                        if (tr > now) { next = tr; minDiff = 0; continue; }
+                        d = 7;
+                    }
+                    if (d < minDiff) { minDiff = d; next = new Date(now); next.setDate(now.getDate()+d); next.setHours(task.cron.hour, task.cron.minute, 0, 0); }
+                }
+            } else {
+                let d = task.cron.day - now.getDay(); if (d < 0) d += 7;
+                if (d === 0) {
+                    const tr = new Date(now); tr.setHours(task.cron.hour, task.cron.minute, 0, 0);
+                    if (tr > now) next = tr;
+                    else { next.setDate(now.getDate()+7); next.setHours(task.cron.hour, task.cron.minute, 0, 0); }
+                } else { next.setDate(now.getDate()+d); next.setHours(task.cron.hour, task.cron.minute, 0, 0); }
+            }
+            return next;
+        }
+
+        function formatCountdown(ms) {
+            if (ms < 0) return 'Running...';
+            const h = Math.floor(ms/3600000), m = Math.floor((ms%3600000)/60000), s = Math.floor((ms%60000)/1000);
+            if (h > 24) { const d = Math.floor(h/24); return `${d}d ${h%24}h ${m}m`; }
+            return `${h}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s`;
+        }
+
+        function openReport(taskId) {
+            activeTaskId = taskId;
+            const task = tasks.find(t => t.taskId === taskId);
+            const panel = document.getElementById('report-panel');
+            const title = document.getElementById('report-panel-title');
+            const tabs = document.getElementById('report-tabs');
+            const content = document.getElementById('report-content');
+
+            title.textContent = '📄 ' + task.title + ' — Reports';
+            panel.classList.add('visible');
+
+            // Highlight active card
+            document.querySelectorAll('.task-card').forEach(c => c.classList.remove('active'));
+            const activeCard = document.querySelector(`[data-task-key="${taskId}"]`);
+            if (activeCard) activeCard.classList.add('active');
+
+            if (!reportsData || !reportsData.tasks[taskId] || reportsData.tasks[taskId].runs.length === 0) {
+                tabs.innerHTML = '';
+                content.innerHTML = '<div class="no-report">ამ თასქისთვის რეპორტი ჯერ არ არსებობს</div>';
+                return;
+            }
+
+            const runs = reportsData.tasks[taskId].runs;
+            tabs.innerHTML = runs.map((run, i) => {
+                const d = new Date(run.date);
+                const label = `${d.getDate()} ${monthNames[d.getMonth()].slice(0,3)}`;
+                return `<button class="report-tab ${i===0?'active':''}" onclick="showRun('${taskId}',${i})">${run.title} <span class="report-date-badge">${label}</span></button>`;
+            }).join('');
+
+            showRun(taskId, 0);
+
+            // Scroll to panel
+            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function showRun(taskId, index) {
+            const content = document.getElementById('report-content');
+            const runs = reportsData.tasks[taskId].runs;
+            const run = runs[index];
+
+            document.querySelectorAll('.report-tab').forEach((t, i) => {
+                t.classList.toggle('active', i === index);
+            });
+
+            content.innerHTML = md(run.report);
+        }
+
+        function closeReport() {
+            document.getElementById('report-panel').classList.remove('visible');
+            document.querySelectorAll('.task-card').forEach(c => c.classList.remove('active'));
+            activeTaskId = null;
+        }
+
+        function renderTasks() {
+            const grid = document.getElementById('task-grid');
+            grid.innerHTML = '';
+            const now = new Date();
+
+            tasks.forEach(task => {
+                const nextRun = getNextRun(task);
+                const timeUntil = nextRun - now;
+                const isToday = nextRun.toDateString() === now.toDateString();
+                const hasReports = reportsData && reportsData.tasks[task.taskId] && reportsData.tasks[task.taskId].runs.length > 0;
+                const reportCount = hasReports ? reportsData.tasks[task.taskId].runs.length : 0;
+                const lastRun = reportsData && reportsData.tasks[task.taskId] ? reportsData.tasks[task.taskId].last_run_at : '';
+                const lastRunDate = lastRun ? new Date(lastRun) : null;
+                const lastRunStr = lastRunDate ? `${lastRunDate.getDate()} ${monthNames[lastRunDate.getMonth()].slice(0,3)}` : '—';
+
+                const card = document.createElement('div');
+                card.className = `task-card ${activeTaskId === task.taskId ? 'active' : ''}`;
+                card.setAttribute('data-task-key', task.taskId);
+                card.onclick = () => openReport(task.taskId);
+                card.innerHTML = `
+                    <div class="task-card-header">
+                        <div>
+                            <div class="task-number">Task #${task.id} ${hasReports ? `<span style="color:var(--blue); margin-left:8px;">📄 ${reportCount} report${reportCount>1?'s':''}</span>` : ''}</div>
+                            <div class="task-title">${task.title}</div>
+                        </div>
+                        <div class="task-status ${isToday ? 'status-active' : 'status-waiting'}">
+                            ${isToday ? '▶ Today' : '◎ Scheduled'}
+                        </div>
+                    </div>
+                    <div class="task-card-body">
+                        <div class="task-description">${task.description}</div>
+                        <div class="task-meta">
+                            ${task.tags.map(t => `<span class="meta-tag">${t}</span>`).join('')}
+                            <span class="meta-tag" style="color:var(--text-mid)">Last: ${lastRunStr}</span>
+                        </div>
+                    </div>
+                    <div class="task-card-footer">
+                        <div class="next-run">🕐 ${task.schedule} — Next: <strong>${dayNamesFull[nextRun.getDay()]}, ${nextRun.getDate()} ${monthNames[nextRun.getMonth()]}</strong></div>
+                        <div class="countdown" data-task-id="${task.id}">${formatCountdown(timeUntil)}</div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+
+            // Stats
+            const nextSoonest = tasks.reduce((min, t) => { const nr = getNextRun(t); return nr < min ? nr : min; }, new Date(9999,0));
+            const diffH = Math.floor((nextSoonest - now) / 3600000);
+            document.getElementById('next-run-stat').textContent = diffH > 24 ? `${Math.floor(diffH/24)}d` : `${diffH}h`;
+
+            const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay() + 1); startOfWeek.setHours(0,0,0,0);
+            const endOfWeek = new Date(startOfWeek); endOfWeek.setDate(startOfWeek.getDate() + 7);
+            let weekRuns = 0;
+            tasks.forEach(t => {
+                if (t.cron.days) t.cron.days.forEach(d => { if (d>=1&&d<=5) weekRuns++; });
+                else if (t.cron.day) weekRuns++;
+                else if (t.cron.days_of_month) t.cron.days_of_month.forEach(dom => { const c = new Date(now.getFullYear(), now.getMonth(), dom); if (c>=startOfWeek&&c<endOfWeek) weekRuns++; });
+            });
+            document.getElementById('runs-this-week').textContent = weekRuns;
+        }
+
+        function renderWeek() {
+            const grid = document.getElementById('week-grid');
+            grid.innerHTML = '';
+            const now = new Date();
+            const start = new Date(now);
+            const dow = now.getDay();
+            start.setDate(now.getDate() + (dow === 0 ? -6 : 1 - dow));
+
+            for (let i = 0; i < 7; i++) {
+                const day = new Date(start); day.setDate(start.getDate() + i);
+                const isToday = day.toDateString() === now.toDateString();
+                const dn = day.getDay();
+                const dt = [];
+                tasks.forEach(t => {
+                    if (t.cron.days && t.cron.days.includes(dn)) dt.push(t);
+                    else if (t.cron.day === dn) dt.push(t);
+                    else if (t.cron.days_of_month && t.cron.days_of_month.includes(day.getDate())) dt.push(t);
+                });
+                const cm = { green: '', blue: 'blue', yellow: 'yellow' };
+                const el = document.createElement('div');
+                el.className = `week-day ${isToday?'today':''}`;
+                el.innerHTML = `<div class="week-day-name">${dayNames[dn]}</div><div class="week-day-num">${day.getDate()}</div><div class="week-tasks">${dt.map(t=>`<div class="week-task-dot ${cm[t.color]}">${t.title.split(' ')[0]}</div>`).join('')}</div>`;
+                grid.appendChild(el);
+            }
+        }
+
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').textContent = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+            document.getElementById('clock-date').textContent = `${dayNamesFull[now.getDay()]}, ${now.getDate()} ${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+        }
+
+        function updateCountdowns() {
+            const now = new Date();
+            tasks.forEach(task => {
+                const el = document.querySelector(`[data-task-id="${task.id}"]`);
+                if (el) el.textContent = formatCountdown(getNextRun(task) - now);
+            });
+        }
+
+        // Usage data (compact header meters)
+        function setMiniRing(meterId, percent, colorClass) {
+            const meter = document.getElementById(meterId);
+            if (!meter) return;
+            const circ = 2 * Math.PI * 13; // r=13
+            const offset = circ - (percent / 100) * circ;
+            const fill = meter.querySelector('.ring-fill');
+            fill.style.strokeDashoffset = offset;
+            fill.className = 'ring-fill ' + (percent >= 80 ? 'red' : percent >= 60 ? 'yellow' : colorClass);
+            meter.querySelector('.usage-mini-pct').textContent = percent + '%';
+        }
+
+        function renderUsage(usage) {
+            if (!usage) return;
+            document.getElementById('usage-compact').style.display = 'flex';
+
+            if (usage.session) {
+                setMiniRing('mini-session', usage.session.percent, 'green');
+                document.getElementById('mini-session-val').textContent = usage.session.percent + '%';
+            }
+            if (usage.weekly_all_models) {
+                setMiniRing('mini-weekly', usage.weekly_all_models.percent, 'blue');
+                document.getElementById('mini-weekly-val').textContent = usage.weekly_all_models.percent + '%';
+            }
+        }
+
+        // Init
+        (async () => {
+            await loadReports();
+            renderTasks();
+            renderWeek();
+            updateClock();
+
+            // Load usage data
+            if (reportsData && reportsData.usage) {
+                renderUsage(reportsData.usage);
+            }
+
+            setInterval(updateClock, 1000);
+            setInterval(updateCountdowns, 1000);
+            setInterval(() => { renderTasks(); renderWeek(); }, 60000);
+            // Auto-refresh reports every 5 minutes
+            setInterval(loadReports, 300000);
+        })();
+    </script>
+</body>
+</html>
