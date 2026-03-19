@@ -255,12 +255,17 @@ def main():
 
         reports[task_id] = task_report
 
-    # Load usage data if available
+    # Load usage data if available and fresh (< 4 hours old)
     usage = None
     if os.path.exists(USAGE_FILE):
         try:
             with open(USAGE_FILE) as f:
                 usage = json.load(f)
+            # Always include scraped_at so the dashboard can check staleness
+            if "scraped_at" not in usage:
+                # Use file modification time as fallback
+                mtime = os.path.getmtime(USAGE_FILE)
+                usage["scraped_at"] = datetime.fromtimestamp(mtime).isoformat() + "Z"
         except Exception:
             pass
 

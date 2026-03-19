@@ -569,8 +569,29 @@
 
         function renderUsage(usage) {
             if (!usage) return;
-            document.getElementById('usage-compact').style.display = 'flex';
+            const compact = document.getElementById('usage-compact');
+            compact.style.display = 'flex';
 
+            // Check staleness — usage data older than 4 hours is meaningless
+            const MAX_AGE_MS = 4 * 60 * 60 * 1000;
+            const scrapedAt = usage.scraped_at ? new Date(usage.scraped_at) : null;
+            const isStale = !scrapedAt || (Date.now() - scrapedAt.getTime() > MAX_AGE_MS);
+
+            if (isStale) {
+                compact.style.opacity = '0.35';
+                compact.title = scrapedAt
+                    ? `მონაცემები მოძველებულია (${scrapedAt.toLocaleDateString('ka-GE')})`
+                    : 'მონაცემები მიუწვდომელია';
+                // Show dashes instead of stale numbers
+                setMiniRing('mini-session', 0, 'green');
+                document.getElementById('mini-session-val').textContent = '—';
+                setMiniRing('mini-weekly', 0, 'blue');
+                document.getElementById('mini-weekly-val').textContent = '—';
+                return;
+            }
+
+            compact.style.opacity = '1';
+            compact.title = '';
             if (usage.session) {
                 setMiniRing('mini-session', usage.session.percent, 'green');
                 document.getElementById('mini-session-val').textContent = usage.session.percent + '%';
